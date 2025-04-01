@@ -1,0 +1,29 @@
+{
+    "USERS": [
+      {
+        "id": 1,
+        "name": "rishika",
+        "position": "intern"
+      },
+      {
+        "id": 2,
+        "name": "aryan",
+        "position": "developer"
+      },
+      {
+        "id": 3,
+        "name": "sanya",
+        "position": "designer"
+      },
+      {
+        "id": 4,
+        "name": "vikram",
+        "position": "manager"
+      },
+      {
+        "id": 5,
+        "name": "neha",
+        "position": "analyst"
+      }
+    ]
+  }
