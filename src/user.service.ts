@@ -2,20 +2,53 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user/entities/user.entity'; 
 import { Repository } from 'typeorm';
+import { ILike } from 'typeorm';
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User) // You still use InjectRepository, but it works directly with the User entity now.
+    @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
 
-  // Find all users
-  async findAll() {
-    return await this.userRepository.find();
+  
+  async findAll(query: any) {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      orderBy = 'id',
+      order = 'ASC',
+    } = query;
+  
+    const take = +limit;
+    const skip = (page - 1) * take;
+  
+    const where = search
+      ? [
+          { firstName: ILike(`%${search}%`) },
+          { lastName: ILike(`%${search}%`) },
+          { email: ILike(`%${search}%`) },
+        ]
+      : {};
+  
+    const [data, total] = await this.userRepository.findAndCount({
+      where,
+      take,
+      skip,
+      order: { [orderBy]: order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC' },
+      withDeleted: false, 
+    });
+  
+    return {
+      data,
+      total,
+      page: +page,
+      pageCount: Math.ceil(total / take),
+    };
   }
-
-  // Find one user by ID
+  
+  
   async findOne(id: number) {
     const user = await this.userRepository.findOne({
       where: { id },
@@ -56,16 +89,59 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
-  // Update user by ID
+  
   async update(id: number, updateData: any) {
-    const user = await this.findOne(id);
+    const user = await this.userRepository.findOne({
+      where: { id },
+      withDeleted: true, 
+    });
+  
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found.`);
+    }
+  
+    if (user.deletedAt || user.isActive === false) {
+      throw new BadRequestException('Cannot update a deleted or inactive user.');
+    }
+  
     Object.assign(user, updateData);
     return await this.userRepository.save(user);
   }
+  
 
-  // Delete user by ID
+  
   async remove(id: number) {
     const user = await this.findOne(id);
-    return await this.userRepository.remove(user);
+  
+    user.isActive = false;
+    await this.userRepository.save(user);
+  
+
+    await this.userRepository.softDelete(id);
+  
+    return { message: 'User soft-deleted and deactivated.' };
   }
+  
+
+  async restore(id: number) {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+  
+    if (!user || !user.deletedAt) {
+      throw new NotFoundException(`User with ID ${id} is not deleted or does not exist.`);
+    }
+  
+  
+    await this.userRepository.restore(id);
+  
+    
+    user.isActive = true;
+    await this.userRepository.save(user);
+  
+    return { message: 'User successfully restored.' };
+  }
+  
+  
 }
